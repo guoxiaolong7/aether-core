@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AETHER CORE — 量子拓扑与形态演化实验室</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg-void: #05070d;
+      --cyan: #00f0ff;
+      --violet: #8a2be2;
+      --hud-bg: rgba(8, 12, 24, 0.86);
+      --hud-border: rgba(0, 240, 255, 0.25);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+      background: var(--bg-void);
+      color: #e6f6ff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    #stage-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    #stage-container canvas {
+      display: block;
+      touch-action: none;
+    }
+
+    .hud-header {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .hud-card,
+    .drawer-panel,
+    .drawer-toggle,
+    .capsule-bar {
+      pointer-events: auto;
+      background: var(--hud-bg);
+      border: 1px solid var(--hud-border);
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.58);
+    }
+
+    @supports (backdrop-filter: blur(14px)) {
+      body:not(.perf-eco) .hud-card,
+      body:not(.perf-eco) .drawer-panel,
+      body:not(.perf-eco) .drawer-toggle,
+      body:not(.perf-eco) .capsule-bar {
+        backdrop-filter: blur(14px);
+        background: rgba(8, 12, 24, 0.62);
+      }
+    }
+
+    .hud-card {
+      border-radius: 14px;
+      padding: 12px 16px;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .diamond-mark {
+      width: 10px;
+      height: 10px;
+      transform: rotate(45deg);
+      border: 1px solid var(--cyan);
+      background: rgba(0, 240, 255, 0.35);
+      flex-shrink: 0;
+    }
+
+    .hud-title {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.22em;
+      color: #ffffff;
+    }
+
+    .stage-tag {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      color: #d8b8ff;
+      background: rgba(138, 43, 226, 0.22);
+      border: 1px solid rgba(138, 43, 226, 0.5);
+      border-radius: 4px;
+      padding: 2px 6px;
+    }
+
+    .hud-subtitle {
+      margin-top: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      color: #8ab4cc;
+    }
+
+    .hud-metrics {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      color: #bfefff;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric-val {
+      color: var(--cyan);
+      font-weight: 700;
+    }
+
+    .metric-mode {
+      color: #d8b8ff;
+      font-weight: 700;
+    }
+
+    .sep {
+      color: rgba(255, 255, 255, 0.25);
+    }
+
+    /* 右侧可折叠控制台 */
+    .hud-right {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 30;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .drawer-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 12px;
+      padding: 10px 14px;
+      color: #e6f6ff;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .drawer-toggle:hover {
+      border-color: rgba(0, 240, 255, 0.65);
+      color: var(--cyan);
+    }
+
+    .drawer-panel {
+      width: 272px;
+      max-width: calc(100vw - 24px);
+      max-height: calc(100dvh - 130px);
+      overflow-y: auto;
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .drawer-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .drawer-head-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      color: #ffffff;
+    }
+
+    .icon-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.05);
+      color: #8ab4cc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .icon-btn:hover {
+      border-color: rgba(0, 240, 255, 0.45);
+      color: #ffffff;
+    }
+
+    .control-group {
+      margin-top: 14px;
+    }
+
+    .control-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      color: #bfefff;
+    }
+
+    .control-val {
+      color: var(--cyan);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 4px;
+      border-radius: 10px;
+      background: rgba(5, 7, 13, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .seg-btn {
+      border: 0;
+      border-radius: 7px;
+      padding: 7px 8px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #8ab4cc;
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .seg-btn.active-repel {
+      background: rgba(0, 240, 255, 0.2);
+      color: var(--cyan);
+      box-shadow: inset 0 0 0 1px rgba(0, 240, 255, 0.58);
+    }
+
+    .seg-btn.active-attract {
+      background: rgba(138, 43, 226, 0.26);
+      color: #e4caff;
+      box-shadow: inset 0 0 0 1px rgba(138, 43, 226, 0.72);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.15);
+      accent-color: var(--cyan);
+      cursor: pointer;
+    }
+
+    .action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .action-btn {
+      border-radius: 9px;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.05);
+      color: #e6f6ff;
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+      border-color: rgba(0, 240, 255, 0.48);
+    }
+
+    .action-btn.primary {
+      border-color: rgba(0, 240, 255, 0.4);
+      background: rgba(0, 240, 255, 0.12);
+      color: var(--cyan);
+    }
+
+    .action-btn.bloom-on {
+      border-color: rgba(138, 43, 226, 0.65);
+      background: rgba(138, 43, 226, 0.22);
+      color: #e4caff;
+    }
+
+    .action-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .drawer-foot {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      text-align: center;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10px;
+      color: #7ca4bd;
+    }
+
+    /* 底部居中形态切换胶囊栏 */
+    .hud-bottom {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      width: calc(100vw - 24px);
+      max-width: fit-content;
+      pointer-events: none;
+    }
+
+    .capsule-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 6px;
+      border-color: rgba(255, 255, 255, 0.16);
+    }
+
+    .shape-btn {
+      border: 0;
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.03em;
+      color: #8ab4cc;
+      background: transparent;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.22s ease;
+    }
+
+    .shape-btn:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .shape-btn.active {
+      color: #ffffff;
+      background: linear-gradient(90deg, rgba(0, 240, 255, 0.26), rgba(138, 43, 226, 0.32));
+      box-shadow: 0 0 18px rgba(0, 240, 255, 0.28), inset 0 0 0 1px rgba(0, 240, 255, 0.78);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 767px) {
+      .hud-header {
+        top: 14px;
+        left: 14px;
+        right: 68px;
+      }
+      .hud-right {
+        top: 14px;
+        right: 12px;
+      }
+      .hud-right.drawer-open {
+        top: 152px;
+      }
+      .sep-mode {
+        display: none;
+      }
+      .metric-mode-wrap {
+        width: 100%;
+      }
+      .drawer-panel {
+        max-height: calc(100dvh - 272px);
+        padding: 12px 14px;
+      }
+      .control-group {
+        margin-top: 10px;
+      }
+      .action-grid {
+        margin-top: 10px;
+      }
+      .drawer-toggle {
+        padding: 10px;
+      }
+      .drawer-toggle span {
+        display: none;
+      }
+      .hud-bottom {
+        bottom: 14px;
+      }
+      .capsule-bar {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border-radius: 16px;
+      }
+      .shape-btn {
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+    }
+  </style>
+
+  <!-- 锁死同源 Three.js r170 ESM ImportMap -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="stage-container" data-testid="webgl-stage"></div>
+
+  <!-- 左上角标题与实时监控徽章 -->
+  <header class="hud-header">
+    <div class="hud-card">
+      <div class="title-row">
+        <span class="diamond-mark" aria-hidden="true"></span>
+        <h1 class="hud-title">AETHER CORE</h1>
+        <span class="stage-tag">LAB v3</span>
+      </div>
+      <p class="hud-subtitle">QUANTUM TOPOLOGY &amp; MORPHING LAB</p>
+      <div class="hud-metrics" data-testid="hud-metrics">
+        <span>FPS <strong class="metric-val" id="fps-val">60</strong></span>
+        <span class="sep" aria-hidden="true">|</span>
+        <span>PARTICLES <strong class="metric-val" id="pts-val">12,000</strong></span>
+        <span class="sep sep-mode" aria-hidden="true">|</span>
+        <span class="metric-mode-wrap">MODE <strong class="metric-mode" id="mode-val">QUANTUM SPHERE</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 右侧可折叠控制台 -->
+  <aside class="hud-right">
+    <button type="button" class="drawer-toggle" id="drawer-open-btn" aria-label="展开控制台">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line>
+        <line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line>
+        <line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line>
+        <line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line>
+        <line x1="17" y1="16" x2="23" y2="16"></line>
+      </svg>
+      <span>参数控制台</span>
+    </button>
+
+    <section class="drawer-panel hidden" id="drawer-panel" aria-label="物理场与渲染参数控制台">
+      <div class="drawer-head">
+        <div class="drawer-head-title">
+          <span>FIELD CONTROLS</span>
+        </div>
+        <button type="button" class="icon-btn" id="drawer-close-btn" aria-label="收起控制台">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </div>
+
+      <div class="control-group">
+        <div class="control-label-row"><span>力场交互模式</span></div>
+        <div class="segmented">
+          <button type="button" class="seg-btn active-repel" id="btn-repel" data-mode="repel">斥力冲击</button>
+          <button type="button" class="seg-btn" id="btn-attract" data-mode="attract">引力奇点</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <div class="control-label-row">
+          <label for="bloom-slider">泛光强度 (Bloom)</label>
+          <span class="control-val" id="bloom-val">0.85</span>
+        </div>
+        <input id="bloom-slider" type="range" min="0" max="2.4" step="0.05" value="0.85" />
+      </div>
+
+      <div class="control-group">
+        <div class="control-label-row">
+          <label for="rot-slider">旋转速度</label>
+          <span class="control-val" id="rot-val">0.35x</span>
+        </div>
+        <input id="rot-slider" type="range" min="0" max="2.0" step="0.05" value="0.35" />
+      </div>
+
+      <div class="control-group">
+        <div class="control-label-row">
+          <label for="radius-slider">力场半径</label>
+          <span class="control-val" id="radius-val">2.8</span>
+        </div>
+        <input id="radius-slider" type="range" min="1.2" max="5.0" step="0.1" value="2.8" />
+      </div>
+
+      <div class="action-grid">
+        <button type="button" class="action-btn primary" id="btn-pulse">脉冲波</button>
+        <button type="button" class="action-btn" id="btn-reset">重置视角</button>
+        <button type="button" class="action-btn" id="btn-pause">暂停演化</button>
+        <button type="button" class="action-btn bloom-on" id="btn-bloom-toggle">泛光: 开</button>
+      </div>
+
+      <p class="drawer-foot">点击空白处或按 SPACE 发射脉冲波</p>
+    </section>
+  </aside>
+
+  <!-- 底部居中形态切换胶囊栏 -->
+  <nav class="hud-bottom" aria-label="形态演化切换栏">
+    <div class="capsule-bar" id="shape-bar">
+      <button type="button" class="shape-btn active" data-shape="sphere">量子球体</button>
+      <button type="button" class="shape-btn" data-shape="mobius">莫比乌斯环</button>
+      <button type="button" class="shape-btn" data-shape="helix">双螺旋星链</button>
+      <button type="button" class="shape-btn" data-shape="nebula">超新星坍缩</button>
+    </div>
+  </nav>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+    import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+    /**
+     * 全局量化视觉与物理配置常量表（零魔法数字收敛点）
+     */
+    const CONFIG = {
+      colors: {
+        background: 0x05070d,  // 深空黑蓝背景
+        primary: 0x00f0ff,     // 主能量色：电光青
+        secondary: 0x8a2be2,   // 次能量色：星云紫
+        highlight: 0xffffff    // 高光脉冲色
+      },
+      renderer: {
+        exposure: 1.15,        // ACESFilmic 色调映射曝光度
+        maxPixelRatio: 2,      // 硬件 GPU 设备像素比上限
+        fogDensity: 0.028      // 指数雾浓度
+      },
+      bloom: {
+        threshold: 0.25,       // 泛光亮度阈值（避免过曝死白）
+        strength: 0.85,        // 默认泛光强度
+        radius: 0.6            // 泛光扩散半径
+      },
+      camera: {
+        fov: 48,               // 桌面端默认垂直视场角
+        minPortraitFov: 68,    // 窄屏竖屏视场角上限
+        near: 0.1,
+        far: 100,
+        minDistance: 4.5,      // OrbitControls 最近限制，防止穿入核心
+        maxDistance: 18,       // OrbitControls 最远限制，防止丢失主体
+        dampingFactor: 0.05,   // 相机阻尼系数
+        initialPos: [0, 1.4, 8.8]
+      },
+      particles: {
+        desktopCount: 12000,   // 桌面端固定粒子数量
+        mobileCount: 5000,     // 移动端自动降级粒子数量
+        mobileBreakpoint: 768, // 响应式降级宽度阈值
+        sizeGpu: 0.088,        // 开启后期泛光时的粒子尺寸
+        sizeEco: 0.115,        // 软件渲染或关闭泛光时的补偿尺寸
+        opacityGpu: 0.88,
+        opacityEco: 0.92,
+        textureSize: 64        // 离屏 Canvas 径向光晕贴图尺寸
+      },
+      physics: {
+        sphereRadius: 3.1,     // 量子球体基准半径
+        lerpFactor: 0.06,      // 形态演化基础插值速率（基于 dt*60 帧率无关化）
+        colorLerpFactor: 0.08, // 高光色回归速率
+        velocityDamping: 0.89, // 扰动速度指数阻尼系数
+        repulsionRadius: 2.8,  // 默认 3D 力场作用半径
+        repulsionStrength: 1.4,// 力场作用力度系数
+        attractPullRatio: 0.72,// 引力模式向心拉力倍率
+        attractSwirlRatio: 0.85,// 引力模式切向漩涡倍率
+        velocityScale: 4.2,    // 速度位移积分倍率
+        maxDelta: 0.05,        // 最大时间步长钳位，防止切后台瞬移
+        clickMaxMovePx: 5      // 判定“原地点击发射脉冲波”的最大允许位移 (px)
+      },
+      pulse: {
+        duration: 1.2,         // 脉冲能量波持续时间（秒）
+        maxRadius: 6.2,        // 波峰最大扩散半径
+        bandWidth: 0.65,       // 波峰影响带厚度
+        pushStrength: 14.5     // 波峰径向推力系数
+      },
+      shapes: {
+        sphere: { en: 'QUANTUM SPHERE', scale: 1.0, tiltX: 0.12, tiltZ: 0.08 },
+        mobius: { en: 'MOBIUS TORUS',   scale: 0.76, tiltX: 0.55, tiltZ: 0.28, majorR: 2.45, halfWidth: 1.15, tilt: 0.48 },
+        helix:  { en: 'DNA HELIX',      scale: 0.7,  tiltX: 0.05, tiltZ: 0.05, radius: 1.38, heightSpan: 4.6, turns: 2.6, rungCount: 18 },
+        nebula: { en: 'SUPERNOVA VORTEX', scale: 0.85, tiltX: 0.85, tiltZ: 0.18, arms: 4, maxR: 4.25, tilt: 0.42 }
+      }
+    };
+
+    // 模块顶层预分配可复用数学对象（主渲染循环零 GC 压力）
+    const _raycaster = new THREE.Raycaster();
+    const _pointerNdc = new THREE.Vector2();
+    const _interactionPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+    const _planeNormal = new THREE.Vector3();
+    const _worldCursor = new THREE.Vector3();
+    const _localCursor = new THREE.Vector3();
+    const _originVec = new THREE.Vector3(0, 0, 0);
+    const _initialCamPos = new THREE.Vector3(...CONFIG.camera.initialPos);
+
+    function getResponsiveParticleCount(w) {
+      return w < CONFIG.particles.mobileBreakpoint
+        ? CONFIG.particles.mobileCount
+        : CONFIG.particles.desktopCount;
+    }
+
+    function isClickWithinThreshold(dx, dy, maxMovePx = CONFIG.physics.clickMaxMovePx) {
+      return dx * dx + dy * dy < maxMovePx * maxMovePx;
+    }
+
+    function detectSoftwareWebGL() {
+      try {
+        const probe = document.createElement('canvas');
+        const gl = probe.getContext('webgl2') || probe.getContext('webgl');
+        if (!gl) return true;
+        const ext = gl.getExtension('WEBGL_debug_renderer_info');
+        const param = ext ? ext.UNMASKED_RENDERER_WEBGL : gl.RENDERER;
+        const gpu = String(gl.getParameter(param) || '');
+        gl.getExtension('WEBGL_lose_context')?.loseContext();
+        return /SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(gpu);
+      } catch {
+        return false;
+      }
+    }
+
+    const isSoftwareGl = detectSoftwareWebGL();
+    if (isSoftwareGl) document.body.classList.add('perf-eco');
+
+    const APP_STATE = {
+      currentShape: 'sphere',
+      bloomIntensity: CONFIG.bloom.strength,
+      rotationSpeed: 0.35,
+      forceRadius: CONFIG.physics.repulsionRadius,
+      interactionMode: 'repel',
+      isPaused: false,
+      bloomEnabled: !isSoftwareGl,
+      particleCount: getResponsiveParticleCount(window.innerWidth),
+      fps: 60
+    };
+    document.body.dataset.shape = APP_STATE.currentShape;
+    document.body.dataset.interaction = APP_STATE.interactionMode;
+
+    // 无偏 32-bit 比特混合哈希
+    function hash01(index, salt = 0) {
+      let h = (index + 1 + salt * 1013904223) | 0;
+      h ^= h >>> 16;
+      h = Math.imul(h, 0x7feb352d);
+      h ^= h >>> 15;
+      h = Math.imul(h, 0x846ca68b);
+      h ^= h >>> 16;
+      return (h >>> 0) / 4294967295;
+    }
+
+    function createParticleGlowTexture(size = 64) {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const half = size / 2;
+      const grad = ctx.createRadialGradient(half, half, 0, half, half, half);
+      grad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
+      grad.addColorStop(0.22, 'rgba(220, 252, 255, 0.85)');
+      grad.addColorStop(0.5, 'rgba(110, 235, 255, 0.32)');
+      grad.addColorStop(0.8, 'rgba(70, 110, 255, 0.08)');
+      grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, size, size);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.needsUpdate = true;
+      return tex;
+    }
+
+    // 4 种数学拓扑形态生成器
+    function fillFibonacciSpherePositions(target, count, maxRadius) {
+      const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+      for (let i = 0; i < count; i++) {
+        const t = count > 1 ? i / (count - 1) : 0;
+        const yNorm = 1 - t * 2;
+        const radialSlice = Math.sqrt(Math.max(0, 1 - yNorm * yNorm));
+        const theta = goldenAngle * i;
+        const shellHash = hash01(i, 1);
+        const baseScale = shellHash < 0.72
+          ? 0.87 + 0.11 * hash01(i, 2)
+          : 0.44 + 0.4 * shellHash;
+        const ripple = 1 + 0.045 * Math.sin(theta * 3.0 + yNorm * 4.5) * Math.cos(yNorm * 3.2);
+        const r = maxRadius * baseScale * ripple;
+        const idx = i * 3;
+        target[idx] = Math.cos(theta) * radialSlice * r;
+        target[idx + 1] = yNorm * r;
+        target[idx + 2] = Math.sin(theta) * radialSlice * r;
+      }
+    }
+
+    function fillMobiusTorusPositions(target, count) {
+      const { majorR, halfWidth, tilt } = CONFIG.shapes.mobius;
+      const cosT = Math.cos(tilt);
+      const sinT = Math.sin(tilt);
+      for (let i = 0; i < count; i++) {
+        const u = (i / count) * Math.PI * 2 + (hash01(i, 11) - 0.5) * 0.04;
+        const vRaw = hash01(i, 12) * 2 - 1;
+        const v = Math.sign(vRaw) * Math.pow(Math.abs(vRaw), 0.78) * halfWidth;
+        const thickness = (hash01(i, 13) - 0.5) * 0.24;
+        const halfU = u * 0.5;
+        const ringR = majorR + v * Math.cos(halfU);
+        const x0 = ringR * Math.cos(u);
+        const y0 = ringR * Math.sin(u);
+        const z0 = v * Math.sin(halfU) + thickness;
+        const idx = i * 3;
+        target[idx] = x0;
+        target[idx + 1] = y0 * cosT - z0 * sinT;
+        target[idx + 2] = y0 * sinT + z0 * cosT;
+      }
+    }
+
+    function fillDnaHelixPositions(target, count) {
+      const { radius, heightSpan, turns, rungCount } = CONFIG.shapes.helix;
+      for (let i = 0; i < count; i++) {
+        const idx = i * 3;
+        const role = hash01(i, 21);
+        if (role < 0.72) {
+          const strand = i % 2 === 0 ? 0 : Math.PI;
+          const t = i / count;
+          const y = (t - 0.5) * heightSpan + (hash01(i, 22) - 0.5) * 0.08;
+          const angle = t * Math.PI * 2 * turns + strand;
+          const r = radius + (hash01(i, 23) - 0.5) * 0.34;
+          const aJ = (hash01(i, 24) - 0.5) * 0.22;
+          target[idx] = Math.cos(angle + aJ) * r;
+          target[idx + 1] = y;
+          target[idx + 2] = Math.sin(angle + aJ) * r;
+        } else {
+          const rungIdx = Math.floor(hash01(i, 25) * rungCount);
+          const t = (rungIdx + 0.5) / rungCount;
+          const y = (t - 0.5) * heightSpan + (hash01(i, 26) - 0.5) * 0.07;
+          const angle = t * Math.PI * 2 * turns;
+          const xA = Math.cos(angle) * radius;
+          const zA = Math.sin(angle) * radius;
+          const bridge = hash01(i, 27) * 2 - 1;
+          target[idx] = xA * bridge + (hash01(i, 28) - 0.5) * 0.08;
+          target[idx + 1] = y;
+          target[idx + 2] = zA * bridge + (hash01(i, 29) - 0.5) * 0.08;
+        }
+      }
+    }
+
+    function fillSupernovaVortexPositions(target, count) {
+      const { arms, maxR, tilt } = CONFIG.shapes.nebula;
+      const cosT = Math.cos(tilt);
+      const sinT = Math.sin(tilt);
+      for (let i = 0; i < count; i++) {
+        const idx = i * 3;
+        const armIndex = i % arms;
+        const u = hash01(i, 31);
+        const r = 0.22 + Math.pow(u, 0.78) * (maxR - 0.22);
+        const angle = (armIndex / arms) * Math.PI * 2 + r * 1.45 +
+          (hash01(i, 32) - 0.5) * (0.65 / (0.35 + r * 0.35));
+        const x0 = Math.cos(angle) * r;
+        const z0 = Math.sin(angle) * r;
+        const vSpread = 0.52 * Math.exp(-r * 0.45) + 0.1;
+        const y0 = (hash01(i, 33) - 0.5) * 2 * vSpread;
+        target[idx] = x0;
+        target[idx + 1] = y0 * cosT - z0 * sinT;
+        target[idx + 2] = y0 * sinT + z0 * cosT;
+      }
+    }
+
+    function fillRadialGradientColors(colors, positions, count, maxRadius) {
+      const pR = 0.0, pG = 0.941176, pB = 1.0;
+      const sR = 0.541176, sG = 0.168627, sB = 0.886275;
+      const innerEdge = maxRadius * 0.28;
+      const span = Math.max(0.001, maxRadius * 1.15 - innerEdge);
+      for (let i = 0; i < count; i++) {
+        const idx = i * 3;
+        const x = positions[idx], y = positions[idx + 1], z = positions[idx + 2];
+        const ratio = Math.min(1, Math.max(0, (Math.sqrt(x * x + y * y + z * z) - innerEdge) / span));
+        const blend = Math.pow(ratio, 1.1);
+        let r = pR + (sR - pR) * blend;
+        let g = pG + (sG - pG) * blend;
+        let b = pB + (sB - pB) * blend;
+        if (ratio < 0.32) {
+          const boost = (0.32 - ratio) * 0.95;
+          r = Math.min(1, r + boost);
+          g = Math.min(1, g + boost * 0.22);
+        }
+        colors[idx] = r; colors[idx + 1] = g; colors[idx + 2] = b;
+      }
+    }
+
+    // 渲染器、场景、相机与后期泛光初始化
+    const container = document.getElementById('stage-container');
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: !isSoftwareGl,
+      powerPreference: 'high-performance'
+    });
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = CONFIG.renderer.exposure;
+    renderer.setPixelRatio(
+      isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, CONFIG.renderer.maxPixelRatio)
+    );
+    renderer.setSize(width, height);
+    container.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(CONFIG.colors.background);
+    scene.fog = new THREE.FogExp2(CONFIG.colors.background, CONFIG.renderer.fogDensity);
+
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmremGenerator.dispose();
+
+    const aspect = width / height;
+    const baseFov =
+      aspect < 1
+        ? Math.min(CONFIG.camera.minPortraitFov, Math.round(CONFIG.camera.fov / Math.max(aspect, 0.62)))
+        : CONFIG.camera.fov;
+    const camera = new THREE.PerspectiveCamera(
+      baseFov,
+      aspect,
+      CONFIG.camera.near,
+      CONFIG.camera.far
+    );
+    camera.position.copy(_initialCamPos);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = !isSoftwareGl;
+    controls.dampingFactor = CONFIG.camera.dampingFactor;
+    controls.enablePan = false;
+    controls.minDistance = CONFIG.camera.minDistance;
+    controls.maxDistance = CONFIG.camera.maxDistance;
+    controls.target.copy(_originVec);
+    controls.update();
+
+    let isOrbitDragging = false;
+    let cameraResetActive = false;
+    controls.addEventListener('start', () => {
+      isOrbitDragging = true;
+      cameraResetActive = false;
+    });
+    controls.addEventListener('end', () => {
+      isOrbitDragging = false;
+    });
+
+    scene.add(new THREE.HemisphereLight(0x8fe8ff, 0x1e0e38, 0.85));
+    const keyLight = new THREE.DirectionalLight(0xeefaff, 1.45);
+    keyLight.position.set(5, 6, 5);
+    scene.add(keyLight);
+
+    const rimCyan = new THREE.PointLight(CONFIG.colors.primary, 2.8, 16, 1.6);
+    rimCyan.position.set(-4.2, 2.2, 3.5);
+    scene.add(rimCyan);
+
+    const rimViolet = new THREE.PointLight(CONFIG.colors.secondary, 2.6, 16, 1.6);
+    rimViolet.position.set(4.2, -2.0, -3.5);
+    scene.add(rimViolet);
+
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(width, height),
+      APP_STATE.bloomIntensity,
+      CONFIG.bloom.radius,
+      CONFIG.bloom.threshold
+    );
+    composer.addPass(bloomPass);
+    composer.addPass(new OutputPass());
+
+    // 内核复合几何体
+    const coreGroup = new THREE.Group();
+    const crystalMat = new THREE.MeshPhysicalMaterial({
+      color: 0x071a33,
+      emissive: CONFIG.colors.primary,
+      emissiveIntensity: 0.48,
+      metalness: 0.35,
+      roughness: 0.16,
+      clearcoat: 1.0,
+      transparent: true,
+      opacity: 0.48,
+      flatShading: true
+    });
+    const innerCrystal = new THREE.Mesh(new THREE.IcosahedronGeometry(0.86, 1), crystalMat);
+    coreGroup.add(innerCrystal);
+
+    const innerWireframe = new THREE.LineSegments(
+      new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(1.16, 1)),
+      new THREE.LineBasicMaterial({ color: CONFIG.colors.primary, transparent: true, opacity: 0.65 })
+    );
+    coreGroup.add(innerWireframe);
+
+    const ringPrimary = new THREE.Mesh(
+      new THREE.TorusGeometry(1.62, 0.024, 16, 128),
+      new THREE.MeshStandardMaterial({
+        color: 0xc2f8ff, emissive: CONFIG.colors.primary, emissiveIntensity: 0.55,
+        metalness: 0.92, roughness: 0.16
+      })
+    );
+    ringPrimary.rotation.set(Math.PI * 0.28, 0, Math.PI * 0.14);
+    coreGroup.add(ringPrimary);
+
+    const ringSecondary = new THREE.Mesh(
+      new THREE.TorusGeometry(1.94, 0.02, 16, 128),
+      new THREE.MeshStandardMaterial({
+        color: 0xdcc8ff, emissive: CONFIG.colors.secondary, emissiveIntensity: 0.65,
+        metalness: 0.9, roughness: 0.2
+      })
+    );
+    ringSecondary.rotation.set(-Math.PI * 0.34, 0, -Math.PI * 0.22);
+    coreGroup.add(ringSecondary);
+    scene.add(coreGroup);
+
+    // 预分配 4 套目标位置与色彩缓冲
+    const MAX_PARTICLES = CONFIG.particles.desktopCount;
+    const positions = new Float32Array(MAX_PARTICLES * 3);
+    const velocities = new Float32Array(MAX_PARTICLES * 3);
+    const colors = new Float32Array(MAX_PARTICLES * 3);
+
+    const shapeTargets = {
+      sphere: new Float32Array(MAX_PARTICLES * 3),
+      mobius: new Float32Array(MAX_PARTICLES * 3),
+      helix:  new Float32Array(MAX_PARTICLES * 3),
+      nebula: new Float32Array(MAX_PARTICLES * 3)
+    };
+    const shapeColors = {
+      sphere: new Float32Array(MAX_PARTICLES * 3),
+      mobius: new Float32Array(MAX_PARTICLES * 3),
+      helix:  new Float32Array(MAX_PARTICLES * 3),
+      nebula: new Float32Array(MAX_PARTICLES * 3)
+    };
+
+    function precomputeAllShapes(count) {
+      fillFibonacciSpherePositions(shapeTargets.sphere, count, CONFIG.physics.sphereRadius);
+      fillMobiusTorusPositions(shapeTargets.mobius, count);
+      fillDnaHelixPositions(shapeTargets.helix, count);
+      fillSupernovaVortexPositions(shapeTargets.nebula, count);
+      for (const k of ['sphere', 'mobius', 'helix', 'nebula']) {
+        fillRadialGradientColors(shapeColors[k], shapeTargets[k], count, CONFIG.physics.sphereRadius);
+      }
+    }
+
+    precomputeAllShapes(APP_STATE.particleCount);
+    let activeTarget = shapeTargets.sphere;
+    let activeBaseColors = shapeColors.sphere;
+    positions.set(activeTarget);
+    colors.set(activeBaseColors);
+
+    const particleGeometry = new THREE.BufferGeometry();
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    particleGeometry.setDrawRange(0, APP_STATE.particleCount);
+
+    const particleTexture = createParticleGlowTexture(CONFIG.particles.textureSize);
+    const particleMaterial = new THREE.PointsMaterial({
+      size: isSoftwareGl ? CONFIG.particles.sizeEco : CONFIG.particles.sizeGpu,
+      map: particleTexture,
+      vertexColors: true,
+      transparent: true,
+      opacity: isSoftwareGl ? CONFIG.particles.opacityEco : CONFIG.particles.opacityGpu,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true
+    });
+    const particleCloud = new THREE.Points(particleGeometry, particleMaterial);
+    scene.add(particleCloud);
+
+    // 指针、多指触控与轨道拖拽冲突隔离状态
+    const activePointers = new Set();
+    let isPointerActive = false;
+    let pointerDownOnCanvas = false;
+    let wasMultiTouch = false;
+    let pointerDownX = 0;
+    let pointerDownY = 0;
+
+    let pulseActive = false;
+    let pulseAge = 0;
+    let targetCoreScale = CONFIG.shapes.sphere.scale;
+    let targetCoreTiltX = CONFIG.shapes.sphere.tiltX;
+    let targetCoreTiltZ = CONFIG.shapes.sphere.tiltZ;
+
+    function triggerPulseWave() {
+      pulseActive = true;
+      pulseAge = 0;
+    }
+
+    function updatePointerRay(clientX, clientY) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      _pointerNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      _pointerNdc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      camera.getWorldDirection(_planeNormal);
+      _interactionPlane.setFromNormalAndCoplanarPoint(_planeNormal, _originVec);
+      _raycaster.setFromCamera(_pointerNdc, camera);
+      isPointerActive = _raycaster.ray.intersectPlane(_interactionPlane, _worldCursor) !== null;
+    }
+
+    renderer.domElement.addEventListener('pointermove', (e) => {
+      if (activePointers.size > 1) {
+        isPointerActive = false;
+        return;
+      }
+      updatePointerRay(e.clientX, e.clientY);
+    });
+
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+      activePointers.add(e.pointerId);
+      if (activePointers.size > 1) {
+        wasMultiTouch = true;
+        pointerDownOnCanvas = false;
+        isPointerActive = false;
+        return;
+      }
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      pointerDownOnCanvas = true;
+      wasMultiTouch = false;
+      pointerDownX = e.clientX;
+      pointerDownY = e.clientY;
+      updatePointerRay(e.clientX, e.clientY);
+    });
+
+    renderer.domElement.addEventListener('pointerup', (e) => {
+      activePointers.delete(e.pointerId);
+      const shouldCheckClick =
+        pointerDownOnCanvas &&
+        !wasMultiTouch &&
+        activePointers.size === 0 &&
+        (e.pointerType !== 'mouse' || e.button === 0);
+
+      if (shouldCheckClick) {
+        const dx = e.clientX - pointerDownX;
+        const dy = e.clientY - pointerDownY;
+        if (isClickWithinThreshold(dx, dy, CONFIG.physics.clickMaxMovePx)) {
+          triggerPulseWave();
+        }
+      }
+
+      pointerDownOnCanvas = false;
+      if (activePointers.size === 0) {
+        wasMultiTouch = false;
+        if (e.pointerType === 'touch') {
+          isPointerActive = false;
+        }
+      }
+    });
+
+    renderer.domElement.addEventListener('pointercancel', (e) => {
+      activePointers.delete(e.pointerId);
+      pointerDownOnCanvas = false;
+      isPointerActive = false;
+      if (activePointers.size === 0) {
+        wasMultiTouch = false;
+      }
+    });
+
+    renderer.domElement.addEventListener('pointerleave', () => {
+      isPointerActive = false;
+      pointerDownOnCanvas = false;
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        const activeTag = document.activeElement?.tagName;
+        if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA') {
+          e.preventDefault();
+          triggerPulseWave();
+        }
+      }
+    });
+
+    // HUD 绑定
+    const fpsEl = document.getElementById('fps-val');
+    const ptsEl = document.getElementById('pts-val');
+    const modeEl = document.getElementById('mode-val');
+    ptsEl.textContent = APP_STATE.particleCount.toLocaleString();
+
+    const hudRightEl = document.querySelector('.hud-right');
+    const drawerOpenBtn = document.getElementById('drawer-open-btn');
+    const drawerCloseBtn = document.getElementById('drawer-close-btn');
+    const drawerPanel = document.getElementById('drawer-panel');
+    let userToggledDrawer = false;
+
+    function setDrawerOpen(open) {
+      drawerPanel.classList.toggle('hidden', !open);
+      drawerOpenBtn.classList.toggle('hidden', open);
+      hudRightEl.classList.toggle('drawer-open', open);
+    }
+    setDrawerOpen(window.innerWidth >= CONFIG.particles.mobileBreakpoint);
+    drawerOpenBtn.addEventListener('click', () => { userToggledDrawer = true; setDrawerOpen(true); });
+    drawerCloseBtn.addEventListener('click', () => { userToggledDrawer = true; setDrawerOpen(false); });
+
+    document.querySelectorAll('.shape-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        btn.blur();
+        const shape = btn.dataset.shape;
+        if (!shape || shape === APP_STATE.currentShape) return;
+        APP_STATE.currentShape = shape;
+        document.body.dataset.shape = shape;
+        activeTarget = shapeTargets[shape];
+        activeBaseColors = shapeColors[shape];
+        const meta = CONFIG.shapes[shape];
+        targetCoreScale = meta.scale;
+        targetCoreTiltX = meta.tiltX;
+        targetCoreTiltZ = meta.tiltZ;
+        modeEl.textContent = meta.en;
+        document.querySelectorAll('.shape-btn').forEach((b) =>
+          b.classList.toggle('active', b.dataset.shape === shape)
+        );
+      });
+    });
+
+    const btnRepel = document.getElementById('btn-repel');
+    const btnAttract = document.getElementById('btn-attract');
+    function setInteractionMode(mode) {
+      APP_STATE.interactionMode = mode;
+      document.body.dataset.interaction = mode;
+      btnRepel.classList.toggle('active-repel', mode === 'repel');
+      btnAttract.classList.toggle('active-attract', mode === 'attract');
+    }
+    btnRepel.addEventListener('click', () => setInteractionMode('repel'));
+    btnAttract.addEventListener('click', () => setInteractionMode('attract'));
+
+    const bloomSlider = document.getElementById('bloom-slider');
+    const bloomVal = document.getElementById('bloom-val');
+    bloomSlider.addEventListener('input', (e) => {
+      const v = parseFloat(e.target.value);
+      APP_STATE.bloomIntensity = v;
+      bloomPass.strength = v;
+      bloomVal.textContent = v.toFixed(2);
+    });
+
+    const rotSlider = document.getElementById('rot-slider');
+    const rotVal = document.getElementById('rot-val');
+    rotSlider.addEventListener('input', (e) => {
+      const v = parseFloat(e.target.value);
+      APP_STATE.rotationSpeed = v;
+      rotVal.textContent = v.toFixed(2) + 'x';
+    });
+
+    const radiusSlider = document.getElementById('radius-slider');
+    const radiusVal = document.getElementById('radius-val');
+    radiusSlider.addEventListener('input', (e) => {
+      const v = parseFloat(e.target.value);
+      APP_STATE.forceRadius = v;
+      radiusVal.textContent = v.toFixed(1);
+    });
+
+    document.getElementById('btn-pulse').addEventListener('click', triggerPulseWave);
+    document.getElementById('btn-reset').addEventListener('click', () => { cameraResetActive = true; });
+
+    const btnPause = document.getElementById('btn-pause');
+    btnPause.addEventListener('click', () => {
+      APP_STATE.isPaused = !APP_STATE.isPaused;
+      btnPause.textContent = APP_STATE.isPaused ? '继续演化' : '暂停演化';
+    });
+
+    const btnBloomToggle = document.getElementById('btn-bloom-toggle');
+    if (isSoftwareGl) {
+      btnBloomToggle.disabled = true;
+      btnBloomToggle.textContent = '泛光: 关';
+      btnBloomToggle.classList.remove('bloom-on');
+    } else {
+      btnBloomToggle.addEventListener('click', () => {
+        APP_STATE.bloomEnabled = !APP_STATE.bloomEnabled;
+        btnBloomToggle.textContent = APP_STATE.bloomEnabled ? '泛光: 开' : '泛光: 关';
+        btnBloomToggle.classList.toggle('bloom-on', APP_STATE.bloomEnabled);
+        particleMaterial.size = APP_STATE.bloomEnabled ? CONFIG.particles.sizeGpu : CONFIG.particles.sizeEco;
+        particleMaterial.opacity = APP_STATE.bloomEnabled ? CONFIG.particles.opacityGpu : CONFIG.particles.opacityEco;
+      });
+    }
+
+    // Resize 处理
+    window.addEventListener('resize', () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      if (w <= 0 || h <= 0) return;
+
+      const dpr = isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, CONFIG.renderer.maxPixelRatio);
+      const nextAspect = w / h;
+      camera.fov =
+        nextAspect < 1
+          ? Math.min(CONFIG.camera.minPortraitFov, Math.round(CONFIG.camera.fov / Math.max(nextAspect, 0.62)))
+          : CONFIG.camera.fov;
+      camera.aspect = nextAspect;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(dpr);
+      renderer.setSize(w, h);
+      composer.setPixelRatio(dpr);
+      composer.setSize(w, h);
+      bloomPass.resolution.set(w, h);
+
+      if (!userToggledDrawer) {
+        setDrawerOpen(w >= CONFIG.particles.mobileBreakpoint);
+      }
+
+      const nextCount = getResponsiveParticleCount(w);
+      if (nextCount !== APP_STATE.particleCount) {
+        APP_STATE.particleCount = nextCount;
+        precomputeAllShapes(nextCount);
+        activeTarget = shapeTargets[APP_STATE.currentShape];
+        activeBaseColors = shapeColors[APP_STATE.currentShape];
+        positions.set(activeTarget);
+        colors.set(activeBaseColors);
+        velocities.fill(0);
+        particleGeometry.attributes.position.needsUpdate = true;
+        particleGeometry.attributes.color.needsUpdate = true;
+        particleGeometry.setDrawRange(0, nextCount);
+        ptsEl.textContent = nextCount.toLocaleString();
+      }
+    });
+
+    // 动画与物理循环
+    const clock = new THREE.Clock();
+    let elapsed = 0, fpsFrames = 0, fpsTime = 0;
+
+    function afterDraw(cb) {
+      const gl = renderer.getContext();
+      if (typeof gl.fenceSync === 'function') {
+        const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+        gl.flush();
+        const poll = () => {
+          const status = sync ? gl.getSyncParameter(sync, gl.SYNC_STATUS) : gl.SIGNALED;
+          if (status === gl.UNSIGNALED) setTimeout(poll, 5);
+          else { if (sync) gl.deleteSync(sync); setTimeout(cb, 80); }
+        };
+        setTimeout(poll, 5);
+      } else {
+        setTimeout(cb, 80);
+      }
+    }
+
+    function animate() {
+      const rawDelta = clock.getDelta();
+      const dt = Math.min(rawDelta, CONFIG.physics.maxDelta);
+
+      // 切后台恢复时忽略异常超大 rawDelta 对 FPS 采样的污染
+      if (rawDelta < 1.0) {
+        fpsFrames += 1;
+        fpsTime += rawDelta;
+        if (fpsTime >= 0.5) {
+          APP_STATE.fps = Math.max(1, Math.round(fpsFrames / fpsTime));
+          fpsEl.textContent = String(APP_STATE.fps);
+          fpsFrames = 0;
+          fpsTime = 0;
+        }
+      }
+
+      if (cameraResetActive) {
+        const camAlpha = 1 - Math.exp(-6.5 * dt);
+        camera.position.lerp(_initialCamPos, camAlpha);
+        controls.target.lerp(_originVec, camAlpha);
+        if (camera.position.distanceTo(_initialCamPos) < 0.03) {
+          camera.position.copy(_initialCamPos);
+          controls.target.copy(_originVec);
+          cameraResetActive = false;
+        }
+      }
+
+      if (!APP_STATE.isPaused) {
+        elapsed += dt;
+        const speed = APP_STATE.rotationSpeed;
+
+        const coreAlpha = 1 - Math.exp(-5.5 * dt);
+        coreGroup.scale.setScalar(coreGroup.scale.x + (targetCoreScale - coreGroup.scale.x) * coreAlpha);
+        coreGroup.rotation.x += (targetCoreTiltX - coreGroup.rotation.x) * coreAlpha;
+        coreGroup.rotation.z += (targetCoreTiltZ - coreGroup.rotation.z) * coreAlpha;
+
+        innerCrystal.scale.setScalar(1 + Math.sin(elapsed * 1.8) * 0.04);
+        innerCrystal.rotation.y += dt * 0.45 * speed;
+        innerCrystal.rotation.x += dt * 0.2 * speed;
+
+        innerWireframe.scale.setScalar(1 + Math.sin(elapsed * 1.8 + 0.6) * 0.03);
+        innerWireframe.rotation.y -= dt * 0.32 * speed;
+        innerWireframe.rotation.z += dt * 0.16 * speed;
+
+        ringPrimary.rotation.z += dt * 0.85 * speed;
+        ringPrimary.rotation.y += dt * 0.28 * speed;
+        ringSecondary.rotation.z -= dt * 0.72 * speed;
+        ringSecondary.rotation.x -= dt * 0.22 * speed;
+
+        particleCloud.rotation.y += dt * 0.18 * speed;
+        particleCloud.rotation.x = Math.sin(elapsed * 0.25) * 0.08;
+        particleCloud.updateMatrixWorld();
+
+        let waveRadius = -1, waveIntensity = 0;
+        const waveSigma = CONFIG.pulse.bandWidth;
+        if (pulseActive) {
+          pulseAge += dt;
+          const progress = pulseAge / CONFIG.pulse.duration;
+          if (progress >= 1) {
+            pulseActive = false;
+            pulseAge = 0;
+            crystalMat.emissiveIntensity = 0.48;
+          } else {
+            waveRadius = progress * CONFIG.pulse.maxRadius;
+            waveIntensity = Math.sin(progress * Math.PI);
+            crystalMat.emissiveIntensity = 0.48 + waveIntensity * 0.9;
+          }
+        }
+
+        // 仅在单指/鼠标悬停且未拖拽旋转时激活 3D 光标力场
+        const forceActive = isPointerActive && !isOrbitDragging && activePointers.size <= 1;
+        if (forceActive) {
+          _localCursor.copy(_worldCursor);
+          particleCloud.worldToLocal(_localCursor);
+        }
+
+        const cx = _localCursor.x, cy = _localCursor.y, cz = _localCursor.z;
+        const count = APP_STATE.particleCount;
+        const frameScale = dt * 60;
+        const morphAlpha = 1 - Math.pow(1 - CONFIG.physics.lerpFactor, frameScale);
+        const colorAlpha = 1 - Math.pow(1 - CONFIG.physics.colorLerpFactor, frameScale);
+        const velDamping = Math.pow(CONFIG.physics.velocityDamping, frameScale);
+        const fRadius = APP_STATE.forceRadius;
+        const fRadiusSq = fRadius * fRadius;
+        const invFRadius = 1 / Math.max(0.01, fRadius);
+        const isRepel = APP_STATE.interactionMode === 'repel';
+        const strength = CONFIG.physics.repulsionStrength * dt * 16;
+        const pullRatio = CONFIG.physics.attractPullRatio;
+        const swirlRatio = CONFIG.physics.attractSwirlRatio;
+        const velDt = dt * CONFIG.physics.velocityScale;
+        const pulsePush = dt * CONFIG.pulse.pushStrength;
+
+        for (let i = 0; i < count; i++) {
+          const idx = i * 3;
+          let px = positions[idx], py = positions[idx + 1], pz = positions[idx + 2];
+          let vx = velocities[idx], vy = velocities[idx + 1], vz = velocities[idx + 2];
+          let glowBoost = 0;
+
+          if (forceActive) {
+            const dx = px - cx, dy = py - cy, dz = pz - cz;
+            const distSq = dx * dx + dy * dy + dz * dz;
+            if (distSq < fRadiusSq && distSq > 1e-5) {
+              const dist = Math.sqrt(distSq);
+              const falloff = 1 - dist * invFRadius;
+              const invDist = 1 / dist;
+              const nx = dx * invDist, ny = dy * invDist, nz = dz * invDist;
+              if (isRepel) {
+                const push = falloff * falloff * strength;
+                vx += nx * push; vy += ny * push; vz += nz * push;
+                glowBoost = Math.max(glowBoost, falloff * 0.95);
+              } else {
+                const pull = falloff * strength * pullRatio;
+                const swirl = falloff * strength * swirlRatio;
+                vx += -nx * pull - nz * swirl;
+                vy += -ny * pull;
+                vz += -nz * pull + nx * swirl;
+                glowBoost = Math.max(glowBoost, falloff * 0.8);
+              }
+            }
+          }
+
+          if (waveRadius >= 0) {
+            const distO = Math.sqrt(px * px + py * py + pz * pz);
+            const diff = Math.abs(distO - waveRadius);
+            if (diff < waveSigma && distO > 1e-4) {
+              const band = (1 - diff / waveSigma) * waveIntensity;
+              const invO = 1 / distO;
+              const push = band * pulsePush;
+              vx += px * invO * push; vy += py * invO * push; vz += pz * invO * push;
+              glowBoost = Math.max(glowBoost, band);
+            }
+          }
+
+          px += (activeTarget[idx] - px) * morphAlpha + vx * velDt;
+          py += (activeTarget[idx + 1] - py) * morphAlpha + vy * velDt;
+          pz += (activeTarget[idx + 2] - pz) * morphAlpha + vz * velDt;
+
+          positions[idx] = px; positions[idx + 1] = py; positions[idx + 2] = pz;
+          velocities[idx] = vx * velDamping;
+          velocities[idx + 1] = vy * velDamping;
+          velocities[idx + 2] = vz * velDamping;
+
+          const br = activeBaseColors[idx], bg = activeBaseColors[idx + 1], bb = activeBaseColors[idx + 2];
+          const tr = glowBoost > 0 ? Math.min(1, br + (1 - br) * glowBoost) : br;
+          const tg = glowBoost > 0 ? Math.min(1, bg + (1 - bg) * glowBoost) : bg;
+          const tb = glowBoost > 0 ? Math.min(1, bb + (1 - bb) * glowBoost) : bb;
+          colors[idx] += (tr - colors[idx]) * colorAlpha;
+          colors[idx + 1] += (tg - colors[idx + 1]) * colorAlpha;
+          colors[idx + 2] += (tb - colors[idx + 2]) * colorAlpha;
+        }
+
+        particleGeometry.attributes.position.needsUpdate = true;
+        particleGeometry.attributes.color.needsUpdate = true;
+      }
+
+      controls.update();
+
+      if (APP_STATE.bloomEnabled && !isSoftwareGl) {
+        composer.render();
+      } else {
+        renderer.render(scene, camera);
+      }
+
+      if (isSoftwareGl) afterDraw(animate);
+      else requestAnimationFrame(animate);
+    }
+
+    animate();
+  </script>
+</body>
+</html>
